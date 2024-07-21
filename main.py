@@ -5,3 +5,10 @@ import pandas as pd
 import plotly.express as px
 import dash_bootstrap_components as dbc
 import json
+
+# ตรวจสอบเส้นทางไปยังไฟล์ JSON
+file_path = 'pp3-4_2566_province.json'
+geojson_path = 'thailand-provinces.json'  # เพิ่มเส้นทางไปยังไฟล์ GeoJSON
+
+# อ่านข้อมูลจากไฟล์ JSON
+df = pd.read_json(file_path)
