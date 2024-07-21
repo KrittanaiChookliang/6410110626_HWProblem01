@@ -1,42 +1,30 @@
+import json
+import pandas as pd
+import plotly.express as px
 import dash
 from dash import dcc, html
 from dash.dependencies import Input, Output
-import pandas as pd
-import plotly.express as px
-import dash_bootstrap_components as dbc
-import json
 
-# ตรวจสอบเส้นทางไปยังไฟล์ JSON
-file_path = 'pp3-4_2566_province.json'
-geojson_path = 'thailand-provinces.json'  # เพิ่มเส้นทางไปยังไฟล์ GeoJSON
+# Load the data
+with open('pp3-4_2566_province.json', 'r', encoding='utf-8') as f:
+    student_data = json.load(f)
 
-# อ่านข้อมูลจากไฟล์ JSON
-df = pd.read_json(file_path)
+with open('thailand.json', 'r', encoding='utf-8') as f:
+    thailand_geojson = json.load(f)
 
-# อ่านข้อมูลจากไฟล์ GeoJSON
-with open(geojson_path) as f:
-    geojson = json.load(f)
+# Convert the student data into a DataFrame
+df = pd.DataFrame(student_data)
 
-# สร้างคอลัมน์ใหม่สำหรับการแสดงข้อมูลในแผนที่
-df['province'] = df['schools_province']
-df['totalmale'] = df['totalmale'].astype(int)
-df['totalfemale'] = df['totalfemale'].astype(int)
-df['totalstd'] = df['totalstd'].astype(int)
-
-# สร้างแอป Dash
-app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
+# Create the Dash app
+app = dash.Dash(__name__)
 
 app.layout = html.Div([
-    html.H1('Dashboard จำนวนนักเรียนที่จบปี 2566 แยกตามจังหวัดและเพศ'),
+    html.H1("Number of Students Graduated in 2566 (2023)"),
     dcc.Dropdown(
-        id='gender-dropdown',
-        options=[
-            {'label': 'ทั้งหมด', 'value': 'totalstd'},
-            {'label': 'เพศชาย', 'value': 'totalmale'},
-            {'label': 'เพศหญิง', 'value': 'totalfemale'}
-        ],
-        value='totalstd',
-        clearable=False
+        id='province-dropdown',
+        options=[{'label': province, 'value': province} for province in df['schools_province'].unique()],
+        value=df['schools_province'].unique(),
+        multi=True
     ),
     dcc.Graph(id='map-graph'),
     dcc.Graph(id='bar-graph')
@@ -45,33 +33,33 @@ app.layout = html.Div([
 @app.callback(
     [Output('map-graph', 'figure'),
      Output('bar-graph', 'figure')],
-    [Input('gender-dropdown', 'value')]
+    [Input('province-dropdown', 'value')]
 )
-def update_graph(selected_gender):
-    # สร้างแผนที่
-    map_fig = px.choropleth(
-        df,
-        geojson=geojson,
-        locations='province',
-        featureidkey='properties.NAME_1',  # ระบุคีย์ที่ใช้สำหรับการจับคู่ข้อมูลใน GeoJSON
-        color=selected_gender,
-        hover_name='province',
-        hover_data=['totalmale', 'totalfemale', 'totalstd'],
-        color_continuous_scale='Viridis',
-        labels={'totalmale': 'เพศชาย', 'totalfemale': 'เพศหญิง', 'totalstd': 'ทั้งหมด'}
+def update_graphs(selected_provinces):
+    if not selected_provinces:
+        selected_provinces = df['schools_province'].unique()
+    
+    filtered_df = df[df['schools_province'].isin(selected_provinces)]
+    
+    map_fig = px.choropleth_mapbox(
+        filtered_df, 
+        geojson=thailand_geojson, 
+        locations='schools_province', 
+        featureidkey='properties.name', 
+        color='totalstd',
+        mapbox_style="carto-positron",
+        zoom=5, 
+        center={"lat": 13.736717, "lon": 100.523186},
+        opacity=0.5,
+        labels={'totalstd': 'Total Students'}
     )
-    map_fig.update_geos(fitbounds="locations", visible=False)
+    map_fig.update_layout(margin={"r":0,"t":0,"l":0,"b":0})
 
-    # สร้างแผนภูมิแท่ง
     bar_fig = px.bar(
-        df,
-        x='province',
-        y=selected_gender,
-        hover_data=['totalmale', 'totalfemale', 'totalstd'],
-        labels={'province': 'จังหวัด', 'totalmale': 'เพศชาย', 'totalfemale': 'เพศหญิง', 'totalstd': 'ทั้งหมด'}
+        filtered_df.melt(id_vars=['schools_province'], value_vars=['totalmale', 'totalfemale'], var_name='Gender', value_name='Count'),
+        x='schools_province', y='Count', color='Gender', barmode='group'
     )
-    bar_fig.update_layout(xaxis={'categoryorder': 'total descending'})
-
+    
     return map_fig, bar_fig
 
 if __name__ == '__main__':
