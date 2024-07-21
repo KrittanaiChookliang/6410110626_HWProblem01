@@ -12,3 +12,7 @@ geojson_path = 'thailand-provinces.json'  # เพิ่มเส้นทาง
 
 # อ่านข้อมูลจากไฟล์ JSON
 df = pd.read_json(file_path)
+
+# อ่านข้อมูลจากไฟล์ GeoJSON
+with open(geojson_path) as f:
+    geojson = json.load(f)
